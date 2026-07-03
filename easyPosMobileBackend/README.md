@@ -6,7 +6,7 @@ UltimatePOS MySQL database and deploys to PHP hosting (Hostinger) without a VPS.
 ## Structure
 
 ```
-easyPosMobileBackendPhp/
+easyPosMobileBackend/
 ├── public/
 │   ├── index.php        # front controller + routes
 │   └── .htaccess        # pretty-URL rewrite
@@ -47,7 +47,7 @@ Defaults (`business_id`, `location_id`, walk-in `contact_id`) are set in
 ## Run locally
 
 ```bash
-cd easyPosMobileBackendPhp
+cd easyPosMobileBackend
 php -S localhost:8000 -t public
 # → http://localhost:8000/api/health
 ```
