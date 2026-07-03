@@ -1,6 +1,0 @@
-@EasyPosMobileBackend_HostAddress = http://localhost:5027
-
-GET {{EasyPosMobileBackend_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
