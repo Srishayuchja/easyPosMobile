@@ -1,0 +1,2 @@
+# Deny all direct web access to config files (DB credentials).
+Require all denied

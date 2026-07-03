@@ -1,0 +1,35 @@
+@base = http://localhost:8000/api
+
+### Health
+GET {{base}}/health
+Accept: application/json
+
+### Login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "your-password", "role": "admin" }
+
+### Products
+GET {{base}}/products
+Accept: application/json
+
+### Sales (list)
+GET {{base}}/sales
+Accept: application/json
+
+### Sale (create)
+POST {{base}}/sales
+Content-Type: application/json
+
+{
+  "invoiceId": "INV-TEST-1",
+  "cashierId": 1,
+  "subtotal": 1180,
+  "tax": 59,
+  "total": 1239,
+  "paymentMethod": "cash",
+  "items": [
+    { "productId": 1, "qty": 2, "price": 590 }
+  ]
+}

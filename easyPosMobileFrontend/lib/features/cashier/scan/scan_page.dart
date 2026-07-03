@@ -1,0 +1,381 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../app_state.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_text_field.dart';
+import '../../../core/utils.dart';
+import '../../../models/product_model.dart';
+import '../cart/cart_page.dart';
+import '../../auth/login_page.dart';
+
+class ScanPage extends StatefulWidget {
+  const ScanPage({super.key});
+  @override
+  State<ScanPage> createState() => _ScanPageState();
+}
+
+class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin {
+  bool _manualMode = false;
+  final _codeCtrl = TextEditingController();
+  String _toast = '';
+  late final AnimationController _scanLineCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanLineCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    _scanLineCtrl.dispose();
+    super.dispose();
+  }
+
+  void _showToast(String msg) {
+    setState(() => _toast = msg);
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _toast = '');
+    });
+  }
+
+  void _addQuick(ProductModel p) {
+    context.read<AppState>().addToCart(p);
+    _showToast('+1 ${p.name}');
+  }
+
+  void _findByCode() {
+    final q = _codeCtrl.text.trim();
+    final state = context.read<AppState>();
+    final results = state.searchProducts(q);
+    if (results.isNotEmpty) {
+      state.addToCart(results.first);
+      _showToast('+1 ${results.first.name}');
+      _codeCtrl.clear();
+    } else {
+      _showToast('No match found');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final cartCount = state.cartCount;
+    final cartTotal = state.cartTotal;
+    final products  = state.products;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppHeader(
+              title: 'New Sale',
+              subtitle: 'Cashier · ${state.currentUser?.name ?? ''}',
+              trailing: GestureDetector(
+                onTap: () {
+                  state.logout();
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.logout_outlined, size: 20, color: AppColors.textMuted),
+                ),
+              ),
+            ),
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                children: [
+                  // Scanner card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: 8, height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: !_manualMode ? AppColors.success : AppColors.textDim,
+                                  boxShadow: !_manualMode
+                                      ? [BoxShadow(color: AppColors.success.withOpacity(0.3), blurRadius: 8, spreadRadius: 2)]
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(_manualMode ? 'Manual entry' : 'Scanning…',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+                            ]),
+                            GestureDetector(
+                              onTap: () => setState(() => _manualMode = !_manualMode),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.border),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(children: [
+                                  Icon(_manualMode ? Icons.qr_code_2 : Icons.dialpad_outlined, size: 14, color: AppColors.textMuted),
+                                  const SizedBox(width: 5),
+                                  Text(_manualMode ? 'Use camera' : 'Enter code',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+                                ]),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Viewport
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: RadialGradient(
+                                colors: [AppColors.surface, AppColors.background],
+                                center: const Alignment(0, -0.2),
+                              ),
+                              border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _manualMode ? _ManualEntry(ctrl: _codeCtrl, onFind: _findByCode) : _ScanViewport(anim: _scanLineCtrl),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('QUICK ADD',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.3)),
+                  const SizedBox(height: 8),
+
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: products.take(4).map((p) {
+                      return GestureDetector(
+                        onTap: () => _addQuick(p),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Text('+', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                            const SizedBox(width: 6),
+                            Text(p.name.split(' ').take(2).join(' '),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
+                          ]),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Toast
+            if (_toast.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 24, offset: Offset(0, 8))],
+                ),
+                child: Row(children: [
+                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Text(_toast, style: const TextStyle(fontSize: 13, color: AppColors.text)),
+                ]),
+              ),
+
+            // Cart pill
+            if (cartCount > 0)
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartPage())),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: AppColors.accent.withOpacity(0.2), blurRadius: 24, offset: const Offset(0, 8))],
+                    ),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        height: 28,
+                        constraints: const BoxConstraints(minWidth: 28),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentInk,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text('$cartCount',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text('Review cart',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.accentInk)),
+                      ),
+                      Text('LKR ${fmtLKR(cartTotal)}',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.accentInk)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.chevron_right, color: AppColors.accentInk, size: 20),
+                    ]),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanViewport extends StatelessWidget {
+  const _ScanViewport({required this.anim});
+  final AnimationController anim;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Corner reticle
+        SizedBox(
+          width: double.infinity,
+          height: double.infinity,
+          child: CustomPaint(painter: _ReticlePainter()),
+        ),
+        // Ghost QR icon
+        Opacity(
+          opacity: 0.2,
+          child: Icon(Icons.qr_code_2, size: 80, color: AppColors.text),
+        ),
+        // Scan line
+        AnimatedBuilder(
+          animation: anim,
+          builder: (_, __) {
+            final t = anim.value;
+            // Animate top→bottom→top
+            final frac = t < 0.5 ? t * 2 : (1 - t) * 2;
+            return Positioned(
+              top: 40 + frac * (200),
+              left: 40,
+              right: 40,
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    Colors.transparent,
+                    AppColors.accent,
+                    Colors.transparent,
+                  ]),
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: [BoxShadow(color: AppColors.accent.withOpacity(0.6), blurRadius: 8)],
+                ),
+              ),
+            );
+          },
+        ),
+        const Positioned(
+          bottom: 14,
+          child: Text('Point at barcode or QR',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.accent
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    const inset = 60.0;
+    const corner = 26.0;
+    final r = Rect.fromLTWH(inset, inset, size.width - inset * 2, size.height - inset * 2);
+
+    // Top-left
+    canvas.drawLine(Offset(r.left, r.top + corner), Offset(r.left, r.top), paint);
+    canvas.drawLine(Offset(r.left, r.top), Offset(r.left + corner, r.top), paint);
+    // Top-right
+    canvas.drawLine(Offset(r.right - corner, r.top), Offset(r.right, r.top), paint);
+    canvas.drawLine(Offset(r.right, r.top), Offset(r.right, r.top + corner), paint);
+    // Bottom-left
+    canvas.drawLine(Offset(r.left, r.bottom - corner), Offset(r.left, r.bottom), paint);
+    canvas.drawLine(Offset(r.left, r.bottom), Offset(r.left + corner, r.bottom), paint);
+    // Bottom-right
+    canvas.drawLine(Offset(r.right - corner, r.bottom), Offset(r.right, r.bottom), paint);
+    canvas.drawLine(Offset(r.right, r.bottom), Offset(r.right, r.bottom - corner), paint);
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+class _ManualEntry extends StatelessWidget {
+  const _ManualEntry({required this.ctrl, required this.onFind});
+  final TextEditingController ctrl;
+  final VoidCallback onFind;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AppTextField(
+            label: 'BARCODE OR NAME',
+            controller: ctrl,
+            placeholder: 'e.g. 4792024031019',
+            autofocus: true,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: AppButton(
+              label: 'Find product',
+              onPressed: onFind,
+              disabled: false,
+              expand: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
