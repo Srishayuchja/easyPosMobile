@@ -1,17 +1,9 @@
 # EasyPOS Mobile Backend (PHP)
 
-PHP REST API for the EasyPOS Flutter app. It is a port of the original ASP.NET
-backend — **same structure, same database (UltimatePOS), only the language changed**
-— so it deploys to PHP hosting (Hostinger) without a VPS.
+PHP REST API for the EasyPOS Flutter app. It connects to the existing
+UltimatePOS MySQL database and deploys to PHP hosting (Hostinger) without a VPS.
 
-## Structure (maps to the old .NET project)
-
-| PHP file                         | .NET equivalent            |
-| -------------------------------- | -------------------------- |
-| `public/index.php`               | `Program.cs` (entry/router)|
-| `config/config.php`              | `appsettings.json`         |
-| `src/Database.php`               | `Data/AppDbContext.cs`     |
-| `src/Controllers/*.php`          | `Controllers/*.cs`         |
+## Structure
 
 ```
 easyPosMobileBackendPhp/
