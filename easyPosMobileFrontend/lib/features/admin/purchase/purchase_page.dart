@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/action_bar.dart';
 import '../../../core/widgets/prod_avatar.dart';
+import '../../../core/widgets/barcode_scan_page.dart';
 import '../../../core/utils.dart';
 import '../../../models/product_model.dart';
 import '../products/add_product_page.dart';
@@ -21,6 +23,7 @@ class _PurchasePageState extends State<PurchasePage> {
   final _searchCtrl   = TextEditingController();
   final _unitCostCtrl = TextEditingController();
   final _supplierCtrl = TextEditingController();
+  final _qtyCtrl      = TextEditingController(text: '1');
   ProductModel? _selected;
   int _qty = 1;
   bool _saving = false;
@@ -30,7 +33,16 @@ class _PurchasePageState extends State<PurchasePage> {
     _searchCtrl.dispose();
     _unitCostCtrl.dispose();
     _supplierCtrl.dispose();
+    _qtyCtrl.dispose();
     super.dispose();
+  }
+
+  void _setQty(int value) {
+    final v = value < 1 ? 1 : value;
+    setState(() {
+      _qty = v;
+      _qtyCtrl.text = '$v';
+    });
   }
 
   List<ProductModel> _filtered(List<ProductModel> all) {
@@ -44,18 +56,38 @@ class _PurchasePageState extends State<PurchasePage> {
       _selected = p;
       _unitCostCtrl.text = p.buy.toStringAsFixed(0);
       _qty = 1;
+      _qtyCtrl.text = '1';
     });
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScanPage(title: 'Scan product barcode')),
+    );
+    if (code == null || code.isEmpty || !mounted) return;
+    final product = context.read<AppState>().findByBarcode(code);
+    if (product != null) {
+      _select(product);
+    } else {
+      setState(() {
+        _searchCtrl.text = code;
+      });
+    }
   }
 
   Future<void> _addStock() async {
     if (_selected == null) return;
     setState(() => _saving = true);
-    await context.read<AppState>().addStock(_selected!.id, _qty);
+    final applied = await context.read<AppState>().addStock(_selected!.id, _qty);
     if (!mounted) return;
     setState(() => _saving = false);
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Added $_qty units to ${_selected!.name}'), backgroundColor: AppColors.success),
+      SnackBar(
+        content: Text(applied ? 'Added $_qty units to ${_selected!.name}' : 'Submitted for admin approval'),
+        backgroundColor: AppColors.success,
+      ),
     );
   }
 
@@ -98,14 +130,20 @@ class _PurchasePageState extends State<PurchasePage> {
                               decoration: const InputDecoration(
                                 hintText: 'Scan barcode or type name',
                                 hintStyle: TextStyle(color: AppColors.textDim),
+                                filled: false,
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
                                 contentPadding: EdgeInsets.zero,
                                 isDense: true,
                               ),
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => _select(products.first),
+                            onTap: _scanBarcode,
                             child: Container(
                               margin: const EdgeInsets.only(right: 6),
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -230,12 +268,12 @@ class _PurchasePageState extends State<PurchasePage> {
                               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 const Text('CURRENT STOCK',
                                     style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
-                                Text('${p.stock}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text)),
+                                Text('${p.stock} ${p.unit}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.text)),
                               ]),
                               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                                 const Text('AFTER',
                                     style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
-                                Text('${p.stock + _qty}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                                Text('${p.stock + _qty} ${p.unit}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.accent)),
                               ]),
                             ],
                           ),
@@ -246,8 +284,8 @@ class _PurchasePageState extends State<PurchasePage> {
                   const SizedBox(height: 14),
 
                   // Qty stepper
-                  const Text('QUANTITY TO ADD',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.2)),
+                  Text('QUANTITY TO ADD (${p.unit.toUpperCase()})',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.2)),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -259,7 +297,7 @@ class _PurchasePageState extends State<PurchasePage> {
                     child: Row(
                       children: [
                         GestureDetector(
-                          onTap: _qty > 1 ? () => setState(() => _qty--) : null,
+                          onTap: _qty > 1 ? () => _setQty(_qty - 1) : null,
                           child: Container(
                             width: 44, height: 44,
                             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
@@ -267,11 +305,31 @@ class _PurchasePageState extends State<PurchasePage> {
                           ),
                         ),
                         Expanded(
-                          child: Text('$_qty', textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.text)),
+                          child: TextField(
+                            controller: _qtyCtrl,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.text),
+                            decoration: const InputDecoration(
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                            ),
+                            onChanged: (v) {
+                              final parsed = int.tryParse(v);
+                              setState(() => _qty = (parsed == null || parsed < 1) ? 1 : parsed);
+                            },
+                          ),
                         ),
                         GestureDetector(
-                          onTap: () => setState(() => _qty++),
+                          onTap: () => _setQty(_qty + 1),
                           child: Container(
                             width: 44, height: 44,
                             decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(12)),
@@ -285,7 +343,7 @@ class _PurchasePageState extends State<PurchasePage> {
                   Row(
                     children: [10, 24, 50, 100].map((n) => Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _qty = n),
+                        onTap: () => _setQty(n),
                         child: Container(
                           margin: const EdgeInsets.only(right: 6),
                           padding: const EdgeInsets.symmetric(vertical: 7),

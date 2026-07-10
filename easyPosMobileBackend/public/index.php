@@ -7,9 +7,11 @@ declare(strict_types=1);
 use EasyPos\Auth;
 use EasyPos\Database;
 use EasyPos\Response;
+use EasyPos\Controllers\ApprovalController;
 use EasyPos\Controllers\AuthController;
 use EasyPos\Controllers\HealthController;
 use EasyPos\Controllers\ProductController;
+use EasyPos\Controllers\PurchaseController;
 use EasyPos\Controllers\SaleController;
 
 // ── Autoload (simple PSR-4-ish loader for the EasyPos namespace) ─────────────
@@ -91,6 +93,36 @@ switch (true) {
     case $route === 'GET /products':
         $requireAuth();
         (new ProductController($db(), $config))->index();
+        break;
+
+    case $route === 'POST /products':
+        $requireAuth();
+        (new ProductController($db(), $config))->store($body, $authPayload);
+        break;
+
+    case $route === 'POST /purchases':
+        $requireAuth();
+        (new PurchaseController($db(), $config))->store($body, $authPayload);
+        break;
+
+    case $route === 'GET /approvals':
+        $requireAuth();
+        (new ApprovalController($db(), $config))->index();
+        break;
+
+    case $route === 'POST /approvals/approve-all':
+        $requireAuth();
+        (new ApprovalController($db(), $config))->approveAll($authPayload);
+        break;
+
+    case $method === 'POST' && preg_match('#^/approvals/(\d+)/approve$#', $path, $m) === 1:
+        $requireAuth();
+        (new ApprovalController($db(), $config))->approve((int)$m[1], $authPayload);
+        break;
+
+    case $method === 'POST' && preg_match('#^/approvals/(\d+)/reject$#', $path, $m) === 1:
+        $requireAuth();
+        (new ApprovalController($db(), $config))->reject((int)$m[1], $authPayload);
         break;
 
     case $route === 'GET /sales':

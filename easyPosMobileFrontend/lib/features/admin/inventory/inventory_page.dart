@@ -4,6 +4,7 @@ import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/prod_avatar.dart';
+import '../../../core/widgets/barcode_scan_page.dart';
 import '../../../core/utils.dart';
 import '../products/add_product_page.dart';
 
@@ -20,6 +21,15 @@ class _InventoryPageState extends State<InventoryPage> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScanPage(title: 'Scan product barcode')),
+    );
+    if (code == null || code.isEmpty || !mounted) return;
+    setState(() => _searchCtrl.text = code);
   }
 
   @override
@@ -78,10 +88,29 @@ class _InventoryPageState extends State<InventoryPage> {
                             decoration: const InputDecoration(
                               hintText: 'Search products',
                               hintStyle: TextStyle(color: AppColors.textDim),
+                              filled: false,
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
                               contentPadding: EdgeInsets.zero,
                               isDense: true,
                             ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _scanBarcode,
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
+                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.qr_code_scanner, size: 14, color: AppColors.accentInk),
+                              SizedBox(width: 4),
+                              Text('Scan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accentInk)),
+                            ]),
                           ),
                         ),
                       ],
@@ -99,7 +128,7 @@ class _InventoryPageState extends State<InventoryPage> {
                     )
                   else
                     ...products.map((p) {
-                      final low = p.stock < 15;
+                      final low = p.stock < p.alertQty;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),

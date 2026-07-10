@@ -79,12 +79,12 @@ class SaleModel
                  VALUES
                     (:bid, :loc, 'sell', 'final', 'paid', :contact,
                      :inv, :tdate, :sub, :tax, :total,
-                     :by, :now, :now)"
+                     :by, :now1, :now2)"
             );
             $stmt->execute([
                 ':bid' => $businessId, ':loc' => $locationId, ':contact' => $contactId,
                 ':inv' => $invoice, ':tdate' => $now, ':sub' => $subtotal,
-                ':tax' => $tax, ':total' => $total, ':by' => $createdBy, ':now' => $now,
+                ':tax' => $tax, ':total' => $total, ':by' => $createdBy, ':now1' => $now, ':now2' => $now,
             ]);
             $transactionId = (int)$this->db->lastInsertId();
 
@@ -97,7 +97,7 @@ class SaleModel
                      unit_price_before_discount, unit_price, unit_price_inc_tax, item_tax,
                      created_at, updated_at)
                  VALUES
-                    (:tid, :pid, :vid, :qty, :price, :price, :price, 0, :now, :now)"
+                    (:tid, :pid, :vid, :qty, :price1, :price2, :price3, 0, :now1, :now2)"
             );
             $reduceStock = $this->db->prepare(
                 "UPDATE variation_location_details
@@ -123,7 +123,8 @@ class SaleModel
 
                 $insertLine->execute([
                     ':tid' => $transactionId, ':pid' => $productId, ':vid' => $variationId,
-                    ':qty' => $qty, ':price' => $price, ':now' => $now,
+                    ':qty' => $qty, ':price1' => $price, ':price2' => $price, ':price3' => $price,
+                    ':now1' => $now, ':now2' => $now,
                 ]);
                 $reduceStock->execute([
                     ':qty' => $qty, ':vid' => $variationId, ':loc' => $locationId, ':now' => $now,
@@ -135,11 +136,11 @@ class SaleModel
                 "INSERT INTO transaction_payments
                     (transaction_id, business_id, amount, method, paid_on, created_by, created_at, updated_at)
                  VALUES
-                    (:tid, :bid, :amount, :method, :now, :by, :now, :now)"
+                    (:tid, :bid, :amount, :method, :now1, :by, :now2, :now3)"
             );
             $pay->execute([
                 ':tid' => $transactionId, ':bid' => $businessId, ':amount' => $total,
-                ':method' => $paymentMethod, ':now' => $now, ':by' => $createdBy,
+                ':method' => $paymentMethod, ':now1' => $now, ':by' => $createdBy, ':now2' => $now, ':now3' => $now,
             ]);
 
             $this->db->commit();

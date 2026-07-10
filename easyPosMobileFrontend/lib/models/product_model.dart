@@ -6,6 +6,8 @@ class ProductModel {
   final double buy;
   final double sell;
   final int stock;
+  final String brand;
+  final int alertQty;
 
   const ProductModel({
     required this.id,
@@ -15,6 +17,8 @@ class ProductModel {
     required this.buy,
     required this.sell,
     required this.stock,
+    this.brand = '',
+    this.alertQty = 0,
   });
 
   factory ProductModel.fromMap(Map<String, dynamic> map) => ProductModel(
@@ -25,6 +29,8 @@ class ProductModel {
         buy: (map['buy'] as num).toDouble(),
         sell: (map['sell'] as num).toDouble(),
         stock: map['stock'] as int,
+        brand: map['brand'] as String? ?? '',
+        alertQty: map['alertQty'] as int? ?? 0,
       );
 
   ProductModel copyWith({
@@ -35,6 +41,8 @@ class ProductModel {
     double? buy,
     double? sell,
     int? stock,
+    String? brand,
+    int? alertQty,
   }) =>
       ProductModel(
         id: id ?? this.id,
@@ -44,5 +52,7 @@ class ProductModel {
         buy: buy ?? this.buy,
         sell: sell ?? this.sell,
         stock: stock ?? this.stock,
+        brand: brand ?? this.brand,
+        alertQty: alertQty ?? this.alertQty,
       );
 }

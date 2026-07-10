@@ -4,6 +4,7 @@ import '../../models/user_model.dart';
 import '../../models/product_model.dart';
 import '../../models/sale_model.dart';
 import '../../models/cart_item_model.dart';
+import '../../models/approval_request_model.dart';
 
 class ApiService {
   ApiService._();
@@ -56,8 +57,28 @@ class ApiService {
         .toList();
   }
 
-  Future<ProductModel> createProduct(ProductModel product) async {
-    return product;
+  /// Returns the created product if applied immediately (admin), or null if it
+  /// was submitted for approval instead (cashier).
+  Future<ProductModel?> createProduct(ProductModel product) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/products'),
+      headers: _headers,
+      body: jsonEncode({
+        'name': product.name,
+        'barcode': product.barcode,
+        'unit': product.unit,
+        'buy': product.buy,
+        'sell': product.sell,
+        'stock': product.stock,
+        'brand': product.brand,
+        'alertQty': product.alertQty,
+      }),
+    );
+    if (res.statusCode == 202) return null;
+    if (res.statusCode != 201) {
+      throw Exception('Failed to create product: ${res.body}');
+    }
+    return ProductModel.fromMap(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   Future<ProductModel> updateProduct(ProductModel product) async {
@@ -68,12 +89,74 @@ class ApiService {
 
   // ─── Purchases / Stock ────────────────────────────────────────────────────
 
-  Future<void> recordPurchase({
+  /// Returns true if the stock was applied immediately (admin), false if it
+  /// was submitted for approval instead (cashier).
+  Future<bool> recordPurchase({
     required String productId,
     required int qty,
     required double unitCost,
     String? supplier,
-  }) async {}
+  }) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/purchases'),
+      headers: _headers,
+      body: jsonEncode({
+        'productId': int.tryParse(productId) ?? 0,
+        'qty': qty,
+        'unitCost': unitCost,
+        'supplier': supplier,
+      }),
+    );
+    if (res.statusCode == 202) return false;
+    if (res.statusCode != 201) {
+      throw Exception('Failed to record purchase: ${res.body}');
+    }
+    return true;
+  }
+
+  // ─── Approvals ─────────────────────────────────────────────────────────────
+
+  Future<List<ApprovalRequestModel>> fetchApprovals() async {
+    final res = await http.get(
+      Uri.parse('$_baseUrl/approvals'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) return [];
+    final list = jsonDecode(res.body) as List<dynamic>;
+    return list
+        .map((e) => ApprovalRequestModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> approveRequest(int id) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/approvals/$id/approve'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Failed to approve request: ${res.body}');
+    }
+  }
+
+  Future<void> rejectRequest(int id) async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/approvals/$id/reject'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Failed to reject request: ${res.body}');
+    }
+  }
+
+  Future<void> approveAllRequests() async {
+    final res = await http.post(
+      Uri.parse('$_baseUrl/approvals/approve-all'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Failed to approve all requests: ${res.body}');
+    }
+  }
 
   // ─── Sales ─────────────────────────────────────────────────────────────────
 

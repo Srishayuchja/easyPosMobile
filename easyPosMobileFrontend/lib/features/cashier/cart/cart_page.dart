@@ -117,7 +117,13 @@ class _CartPageState extends State<CartPage> {
                                           textAlign: TextAlign.right,
                                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.text),
                                           decoration: const InputDecoration(
+                                            filled: false,
                                             border: InputBorder.none,
+                                            enabledBorder: InputBorder.none,
+                                            focusedBorder: InputBorder.none,
+                                            disabledBorder: InputBorder.none,
+                                            errorBorder: InputBorder.none,
+                                            focusedErrorBorder: InputBorder.none,
                                             contentPadding: EdgeInsets.zero,
                                             isDense: true,
                                           ),

@@ -3,6 +3,7 @@ import 'models/user_model.dart';
 import 'models/product_model.dart';
 import 'models/sale_model.dart';
 import 'models/cart_item_model.dart';
+import 'models/approval_request_model.dart';
 import 'data/services/api_service.dart';
 
 class AppState extends ChangeNotifier {
@@ -12,6 +13,9 @@ class AppState extends ChangeNotifier {
   List<ProductModel> products = [];
   List<SaleModel> sales = [];
   List<CartItemModel> cart = [];
+  List<String> brands = [];
+  List<String> units = ['pcs', 'g', 'kg', 'ml', 'L', 'box', 'pack'];
+  List<ApprovalRequestModel> pendingApprovals = [];
 
   bool _loading = false;
   bool get loading => _loading;
@@ -21,6 +25,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     products = await ApiService.instance.fetchProducts();
     sales = await ApiService.instance.fetchSales();
+    brands = products.map((p) => p.brand).where((b) => b.isNotEmpty).toSet().toList()..sort();
+    if (currentRole == 'admin') {
+      pendingApprovals = await ApiService.instance.fetchApprovals();
+    }
     _loading = false;
     notifyListeners();
   }
@@ -115,30 +123,86 @@ class AppState extends ChangeNotifier {
 
   // ─── Products (Admin) ──────────────────────────────────────────────────────
 
-  Future<void> addProduct(ProductModel product) async {
+  /// Returns true if the product was created immediately (admin), false if it
+  /// was submitted for admin approval instead (cashier).
+  Future<bool> addProduct(ProductModel product) async {
     final saved = await ApiService.instance.createProduct(product);
+    if (saved == null) return false;
     products.add(saved);
+    notifyListeners();
+    return true;
+  }
+
+  void addBrand(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || brands.any((b) => b.toLowerCase() == trimmed.toLowerCase())) return;
+    brands.add(trimmed);
+    brands.sort();
     notifyListeners();
   }
 
-  Future<void> addStock(String productId, int qty) async {
-    await ApiService.instance.recordPurchase(
+  void addUnit(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || units.any((u) => u.toLowerCase() == trimmed.toLowerCase())) return;
+    units.add(trimmed);
+    notifyListeners();
+  }
+
+  /// Returns true if stock was applied immediately (admin), false if it was
+  /// submitted for admin approval instead (cashier).
+  Future<bool> addStock(String productId, int qty) async {
+    final applied = await ApiService.instance.recordPurchase(
       productId: productId,
       qty: qty,
       unitCost: products.firstWhere((p) => p.id == productId).buy,
     );
+    if (!applied) return false;
     final idx = products.indexWhere((p) => p.id == productId);
     if (idx >= 0) {
       products[idx] = products[idx].copyWith(stock: products[idx].stock + qty);
       notifyListeners();
     }
+    return true;
+  }
+
+  // ─── Approvals (Admin) ──────────────────────────────────────────────────────
+
+  Future<void> fetchApprovals() async {
+    pendingApprovals = await ApiService.instance.fetchApprovals();
+    notifyListeners();
+  }
+
+  Future<void> approveRequest(int id) async {
+    await ApiService.instance.approveRequest(id);
+    pendingApprovals.removeWhere((r) => r.id == id);
+    notifyListeners();
+    await initialize();
+  }
+
+  Future<void> rejectRequest(int id) async {
+    await ApiService.instance.rejectRequest(id);
+    pendingApprovals.removeWhere((r) => r.id == id);
+    notifyListeners();
+  }
+
+  Future<void> approveAllRequests() async {
+    await ApiService.instance.approveAllRequests();
+    pendingApprovals = [];
+    notifyListeners();
+    await initialize();
   }
 
   // ─── Computed helpers ──────────────────────────────────────────────────────
 
-  double get todayTotal => sales.fold(0.0, (s, x) => s + x.total);
-  int get lowStockCount => products.where((p) => p.stock < 15).length;
-  double get avgSale => sales.isEmpty ? 0 : todayTotal / sales.length;
+  List<SaleModel> get todaySales {
+    final now = DateTime.now();
+    return sales.where((s) =>
+        s.timestamp.year == now.year && s.timestamp.month == now.month && s.timestamp.day == now.day).toList();
+  }
+
+  double get todayTotal => todaySales.fold(0.0, (s, x) => s + x.total);
+  int get lowStockCount => products.where((p) => p.stock < p.alertQty).length;
+  double get avgSale => todaySales.isEmpty ? 0 : todayTotal / todaySales.length;
 
   List<ProductModel> searchProducts(String q) {
     if (q.isEmpty) return products;
@@ -147,5 +211,13 @@ class AppState extends ChangeNotifier {
         .where((p) =>
             p.name.toLowerCase().contains(lower) || p.barcode.contains(q))
         .toList();
+  }
+
+  ProductModel? findByBarcode(String code) {
+    for (final p in products) {
+      if (p.barcode == code) return p;
+    }
+    final loose = searchProducts(code);
+    return loose.isNotEmpty ? loose.first : null;
   }
 }

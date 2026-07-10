@@ -43,11 +43,25 @@ class AuthController
         }
 
         $name = trim($u['first_name'] . ' ' . (string)$u['last_name']);
+
+        $locStmt = $this->db->prepare(
+            "SELECT bl.name AS location_name
+               FROM business_locations bl
+              WHERE bl.business_id = :bid AND bl.id = :lid
+              LIMIT 1"
+        );
+        $locStmt->execute([
+            ':bid' => (int)$u['business_id'],
+            ':lid' => (int)$this->config['pos']['location_id'],
+        ]);
+        $branch = (string)($locStmt->fetchColumn() ?: '');
+
         $user = [
             'id'       => (string)$u['id'],
             'name'     => $name !== '' ? $name : $u['username'],
             'username' => (string)$u['username'],
             'role'     => $resolvedRole,
+            'branch'   => $branch,
         ];
 
         $token = Auth::issueToken(

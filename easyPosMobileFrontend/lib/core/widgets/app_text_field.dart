@@ -16,6 +16,7 @@ class AppTextField extends StatelessWidget {
     this.autofocus = false,
     this.trailing,
     this.onChanged,
+    this.focusNode,
   });
 
   final String label;
@@ -29,6 +30,7 @@ class AppTextField extends StatelessWidget {
   final bool autofocus;
   final Widget? trailing;
   final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -69,12 +71,14 @@ class AppTextField extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   autofocus: autofocus,
                   obscureText: obscure,
                   onChanged: onChanged,
                   autocorrect: !obscure && !noCorrect,
                   enableSuggestions: !obscure && !noCorrect,
                   textCapitalization: TextCapitalization.none,
+                  autofillHints: null,
                   keyboardType: numeric ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
                   inputFormatters: numeric ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : null,
                   style: const TextStyle(
@@ -85,7 +89,13 @@ class AppTextField extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: placeholder,
                     hintStyle: const TextStyle(color: AppColors.textDim),
+                    filled: false,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                     isDense: true,
                   ),

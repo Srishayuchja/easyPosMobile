@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
@@ -9,6 +10,8 @@ import '../../../core/utils.dart';
 import '../../../models/product_model.dart';
 import '../cart/cart_page.dart';
 import '../../auth/login_page.dart';
+import '../../admin/products/add_product_page.dart';
+import '../../admin/purchase/purchase_page.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -21,18 +24,42 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
   final _codeCtrl = TextEditingController();
   String _toast = '';
   late final AnimationController _scanLineCtrl;
+  late final MobileScannerController _scannerCtrl;
 
   @override
   void initState() {
     super.initState();
     _scanLineCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _scannerCtrl = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
   }
 
   @override
   void dispose() {
     _codeCtrl.dispose();
     _scanLineCtrl.dispose();
+    _scannerCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleManualMode() {
+    setState(() => _manualMode = !_manualMode);
+    if (_manualMode) {
+      _scannerCtrl.stop();
+    } else {
+      _scannerCtrl.start();
+    }
+  }
+
+  void _onBarcodeDetected(BarcodeCapture capture) {
+    final code = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
+    if (code == null || code.isEmpty) return;
+    final product = context.read<AppState>().findByBarcode(code);
+    if (product != null) {
+      context.read<AppState>().addToCart(product);
+      _showToast('+1 ${product.name}');
+    } else {
+      _showToast('No product for "$code"');
+    }
   }
 
   void _showToast(String msg) {
@@ -121,7 +148,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
                             ]),
                             GestureDetector(
-                              onTap: () => setState(() => _manualMode = !_manualMode),
+                              onTap: _toggleManualMode,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
@@ -153,7 +180,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               border: Border.all(color: AppColors.border, style: BorderStyle.solid),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: _manualMode ? _ManualEntry(ctrl: _codeCtrl, onFind: _findByCode) : _ScanViewport(anim: _scanLineCtrl),
+                            child: _manualMode
+                                ? _ManualEntry(ctrl: _codeCtrl, onFind: _findByCode)
+                                : _ScanViewport(
+                                    anim: _scanLineCtrl,
+                                    controller: _scannerCtrl,
+                                    onDetect: _onBarcodeDetected,
+                                  ),
                           ),
                         ),
                       ],
@@ -187,6 +220,53 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         ),
                       );
                     }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('QUICK ACTIONS',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.3)),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddProductPage())),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Column(children: [
+                              Icon(Icons.add_circle_outline, size: 18, color: AppColors.accent),
+                              SizedBox(height: 4),
+                              Text('Add product', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasePage())),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: const Column(children: [
+                              Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.accent),
+                              SizedBox(height: 4),
+                              Text('Add stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -261,24 +341,37 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 }
 
 class _ScanViewport extends StatelessWidget {
-  const _ScanViewport({required this.anim});
+  const _ScanViewport({required this.anim, required this.controller, required this.onDetect});
   final AnimationController anim;
+  final MobileScannerController controller;
+  final void Function(BarcodeCapture) onDetect;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       alignment: Alignment.center,
+      fit: StackFit.expand,
       children: [
+        // Live camera feed
+        MobileScanner(
+          controller: controller,
+          onDetect: onDetect,
+          errorBuilder: (context, error, child) => Container(
+            color: AppColors.background,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.all(16),
+            child: const Text(
+              'Camera unavailable.\nUse manual entry instead.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ),
+        ),
         // Corner reticle
         SizedBox(
           width: double.infinity,
           height: double.infinity,
           child: CustomPaint(painter: _ReticlePainter()),
-        ),
-        // Ghost QR icon
-        Opacity(
-          opacity: 0.2,
-          child: Icon(Icons.qr_code_2, size: 80, color: AppColors.text),
         ),
         // Scan line
         AnimatedBuilder(

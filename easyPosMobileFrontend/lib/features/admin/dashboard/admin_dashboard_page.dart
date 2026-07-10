@@ -11,6 +11,7 @@ import '../products/add_product_page.dart';
 import '../purchase/purchase_page.dart';
 import '../inventory/inventory_page.dart';
 import '../sales/sales_history_page.dart';
+import '../review/review_page.dart';
 
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
@@ -19,10 +20,11 @@ class AdminDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final todayTotal = state.todayTotal;
+    final todaySales = state.todaySales;
     final lowStock   = state.lowStockCount;
     final sales      = state.sales;
     final products   = state.products;
-    final totalItems = sales.fold(0, (s, x) => s + x.itemCount);
+    final totalItems = todaySales.fold(0, (s, x) => s + x.itemCount);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -31,7 +33,9 @@ class AdminDashboardPage extends StatelessWidget {
           children: [
             AppHeader(
               title: 'Hi, ${state.currentUser?.name ?? "Admin"}',
-              subtitle: 'Admin · Galle Road branch',
+              subtitle: (state.currentUser?.branch.isNotEmpty ?? false)
+                  ? 'Admin · ${state.currentUser!.branch}'
+                  : 'Admin',
               trailing: GestureDetector(
                 onTap: () {
                   state.logout();
@@ -86,7 +90,7 @@ class AdminDashboardPage extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 14),
-                            Text('${sales.length} sales  ·  $totalItems items  ·  $lowStock low stock',
+                            Text('${todaySales.length} sales  ·  $totalItems items  ·  $lowStock low stock',
                                 style: TextStyle(fontSize: 12, color: AppColors.accentInk.withOpacity(0.85))),
                           ],
                         ),
@@ -100,10 +104,16 @@ class AdminDashboardPage extends StatelessWidget {
                     children: [
                       StatCard(label: 'Products', value: '${products.length}', sub: 'in catalog'),
                       const SizedBox(width: 10),
-                      StatCard(label: 'Low stock', value: '$lowStock', sub: 'below 15 units',
+                      StatCard(label: 'Low stock', value: '$lowStock', sub: 'below alert qty',
                           accentColor: lowStock > 0 ? AppColors.warning : null),
                       const SizedBox(width: 10),
-                      StatCard(label: 'Avg sale', value: 'LKR ${fmtLKR(state.avgSale)}', sub: 'per transaction'),
+                      StatCard(
+                        label: 'Review',
+                        value: '${state.pendingApprovals.length}',
+                        sub: 'pending requests',
+                        accentColor: state.pendingApprovals.isNotEmpty ? AppColors.accent : null,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewPage())),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -134,7 +144,7 @@ class AdminDashboardPage extends StatelessWidget {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryPage())),
                       ),
                       _ActionCard(
-                        label: 'Sales', sub: '${sales.length} today', icon: Icons.receipt_long_outlined,
+                        label: 'Sales', sub: '${todaySales.length} today', icon: Icons.receipt_long_outlined,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalesHistoryPage())),
                       ),
                     ],
