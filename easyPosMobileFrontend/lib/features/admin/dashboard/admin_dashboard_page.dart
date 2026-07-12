@@ -4,7 +4,6 @@ import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/stat_card.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/action_card.dart';
 import '../../../core/utils.dart';
 import '../../auth/login_page.dart';
@@ -23,7 +22,6 @@ class AdminDashboardPage extends StatelessWidget {
     final todayTotal = state.todayTotal;
     final todaySales = state.todaySales;
     final lowStock = state.lowStockCount;
-    final sales = state.sales;
     final products = state.products;
     final totalItems = todaySales.fold(0, (s, x) => s + x.itemCount);
 
@@ -155,7 +153,7 @@ class AdminDashboardPage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
 
                   const Text('QUICK ACTIONS',
                       style: TextStyle(
@@ -211,100 +209,6 @@ class AdminDashboardPage extends StatelessWidget {
                                 builder: (_) => const SalesHistoryPage())),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('RECENT SALES',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textMuted,
-                              letterSpacing: 0.3)),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const SalesHistoryPage())),
-                        child: const Text('VIEW ALL',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.accent,
-                                letterSpacing: 0.3)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  AppCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: sales.take(3).toList().asMap().entries.map((e) {
-                        final i = e.key;
-                        final s = e.value;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            border: i > 0
-                                ? const Border(
-                                    top: BorderSide(color: AppColors.border))
-                                : null,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                    color: AppColors.surface,
-                                    borderRadius: BorderRadius.circular(10)),
-                                child: const Icon(Icons.receipt_long_outlined,
-                                    size: 18, color: AppColors.textMuted),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(s.id,
-                                        style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.text)),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                        '${s.itemCount} items · ${timeAgo(s.timestamp)} · ${s.cashier}',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.textMuted)),
-                                  ],
-                                ),
-                              ),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  const Text('LKR ',
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          color: AppColors.textMuted,
-                                          fontWeight: FontWeight.w600)),
-                                  Text(fmtLKR(s.total),
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.text)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
                   ),
                 ],
               ),
