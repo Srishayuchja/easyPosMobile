@@ -73,7 +73,7 @@ class ApiService {
         'brand': product.brand,
         'alertQty': product.alertQty,
       }),
-    );
+    ).timeout(const Duration(seconds: 15));
     if (res.statusCode == 202) return null;
     if (res.statusCode != 201) {
       throw Exception('Failed to create product: ${res.body}');
@@ -106,7 +106,7 @@ class ApiService {
         'unitCost': unitCost,
         'supplier': supplier,
       }),
-    );
+    ).timeout(const Duration(seconds: 15));
     if (res.statusCode == 202) return false;
     if (res.statusCode != 201) {
       throw Exception('Failed to record purchase: ${res.body}');
@@ -128,10 +128,23 @@ class ApiService {
         .toList();
   }
 
-  Future<void> approveRequest(int id) async {
+  Future<List<ApprovalRequestModel>> fetchMyRequests() async {
+    final res = await http.get(
+      Uri.parse('$_baseUrl/approvals/mine'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) return [];
+    final list = jsonDecode(res.body) as List<dynamic>;
+    return list
+        .map((e) => ApprovalRequestModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> approveRequest(int id, {double? buy}) async {
     final res = await http.post(
       Uri.parse('$_baseUrl/approvals/$id/approve'),
       headers: _headers,
+      body: jsonEncode({if (buy != null) 'buy': buy}),
     );
     if (res.statusCode != 200) {
       throw Exception('Failed to approve request: ${res.body}');
@@ -208,7 +221,7 @@ class ApiService {
                 })
             .toList(),
       }),
-    );
+    ).timeout(const Duration(seconds: 15));
     if (res.statusCode != 201) {
       throw Exception('Failed to submit sale: ${res.body}');
     }

@@ -110,6 +110,11 @@ switch (true) {
         (new ApprovalController($db(), $config))->index();
         break;
 
+    case $route === 'GET /approvals/mine':
+        $requireAuth();
+        (new ApprovalController($db(), $config))->mine($authPayload);
+        break;
+
     case $route === 'POST /approvals/approve-all':
         $requireAuth();
         (new ApprovalController($db(), $config))->approveAll($authPayload);
@@ -117,7 +122,7 @@ switch (true) {
 
     case $method === 'POST' && preg_match('#^/approvals/(\d+)/approve$#', $path, $m) === 1:
         $requireAuth();
-        (new ApprovalController($db(), $config))->approve((int)$m[1], $authPayload);
+        (new ApprovalController($db(), $config))->approve((int)$m[1], $body, $authPayload);
         break;
 
     case $method === 'POST' && preg_match('#^/approvals/(\d+)/reject$#', $path, $m) === 1:

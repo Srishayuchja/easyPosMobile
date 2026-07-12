@@ -1,6 +1,7 @@
 <?php
 // GET  /api/approvals               → list pending approval requests
-// POST /api/approvals/:id/approve   → approve one (applies it)
+// GET  /api/approvals/mine          → list the caller's own pending + rejected requests
+// POST /api/approvals/:id/approve   → approve one (applies it); body may include { buy } for new_product
 // POST /api/approvals/:id/reject    → reject one
 // POST /api/approvals/approve-all   → approve every pending request
 
@@ -30,9 +31,20 @@ class ApprovalController
         Response::json($rows);
     }
 
-    public function approve(int $id, ?array $authPayload): void
+    public function mine(?array $authPayload): void
+    {
+        $requestedBy = (int)($authPayload['uid'] ?? 1);
+
+        $model = new ApprovalModel($this->db);
+        $rows  = $model->getMineByBusiness((int)$this->config['pos']['business_id'], $requestedBy);
+
+        Response::json($rows);
+    }
+
+    public function approve(int $id, array $body, ?array $authPayload): void
     {
         $reviewerId = (int)($authPayload['uid'] ?? 1);
+        $buy        = isset($body['buy']) ? (float)$body['buy'] : null;
 
         try {
             $model = new ApprovalModel($this->db);
@@ -40,7 +52,8 @@ class ApprovalController
                 $id,
                 (int)$this->config['pos']['business_id'],
                 (int)$this->config['pos']['location_id'],
-                $reviewerId
+                $reviewerId,
+                $buy
             );
         } catch (Throwable $e) {
             Response::error('Failed to approve request', 422, $e->getMessage());

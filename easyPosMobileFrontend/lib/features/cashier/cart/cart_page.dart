@@ -24,10 +24,18 @@ class _CartPageState extends State<CartPage> {
   Future<void> _submit() async {
     setState(() => _submitting = true);
     final state = context.read<AppState>();
-    final sale = await state.submitSale();
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReceiptPage(sale: sale)));
+    try {
+      final sale = await state.submitSale();
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ReceiptPage(sale: sale)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit sale: $e'), backgroundColor: AppColors.danger),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -36,8 +44,7 @@ class _CartPageState extends State<CartPage> {
     final cart = state.cart;
 
     final subtotal = cart.fold(0.0, (s, i) => s + i.lineTotal);
-    final tax = subtotal * 0.05;
-    final total = subtotal + tax;
+    final total = subtotal;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -47,7 +54,11 @@ class _CartPageState extends State<CartPage> {
             AppHeader(
               title: 'Review sale',
               subtitle: '${cart.length} ${cart.length == 1 ? "item" : "items"}',
-              onBack: () => Navigator.pop(context),
+              backLabel: 'Cancel',
+              onBack: () {
+                state.clearCart();
+                Navigator.pop(context);
+              },
             ),
 
             Expanded(
@@ -172,7 +183,6 @@ class _CartPageState extends State<CartPage> {
                     child: Column(
                       children: [
                         _TotalRow(label: 'Subtotal', value: fmtLKR(subtotal)),
-                        _TotalRow(label: 'Service (5%)', value: fmtLKR(tax)),
                         const Divider(color: AppColors.border, height: 17),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -203,10 +213,11 @@ class _CartPageState extends State<CartPage> {
                   Row(
                     children: [
                       _PayBtn(label: 'Cash',   icon: Icons.account_balance_wallet_outlined, selected: _paymentIdx == 0, onTap: () => setState(() => _paymentIdx = 0)),
-                      const SizedBox(width: 8),
-                      _PayBtn(label: 'Card',   icon: Icons.credit_card_outlined,            selected: _paymentIdx == 1, onTap: () => setState(() => _paymentIdx = 1)),
-                      const SizedBox(width: 8),
-                      _PayBtn(label: 'QR Pay', icon: Icons.qr_code_2,                       selected: _paymentIdx == 2, onTap: () => setState(() => _paymentIdx = 2)),
+                      // Card and QR Pay disabled — cash only for now.
+                      // const SizedBox(width: 8),
+                      // _PayBtn(label: 'Card',   icon: Icons.credit_card_outlined,            selected: _paymentIdx == 1, onTap: () => setState(() => _paymentIdx = 1)),
+                      // const SizedBox(width: 8),
+                      // _PayBtn(label: 'QR Pay', icon: Icons.qr_code_2,                       selected: _paymentIdx == 2, onTap: () => setState(() => _paymentIdx = 2)),
                     ],
                   ),
                 ],

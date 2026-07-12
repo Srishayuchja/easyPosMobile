@@ -5,7 +5,7 @@ import 'app_state.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
 import 'features/auth/login_page.dart';
-import 'features/cashier/scan/scan_page.dart';
+import 'features/cashier/home/cashier_home_page.dart';
 import 'features/admin/dashboard/admin_dashboard_page.dart';
 
 void main() {
@@ -46,7 +46,7 @@ class _SplashGate extends StatelessWidget {
     if (state.currentUser != null) {
       return state.currentUser!.role == 'admin'
           ? const AdminDashboardPage()
-          : const ScanPage();
+          : const CashierHomePage();
     }
     return const LoginPage();
   }

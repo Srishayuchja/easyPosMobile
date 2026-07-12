@@ -5,7 +5,7 @@ import '../../app_state.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_text_field.dart';
-import '../cashier/scan/scan_page.dart';
+import '../cashier/home/cashier_home_page.dart';
 import '../admin/dashboard/admin_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -90,7 +90,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => role == 'admin' ? const AdminDashboardPage() : const ScanPage(),
+            builder: (_) => role == 'admin' ? const AdminDashboardPage() : const CashierHomePage(),
           ),
         );
       } else {
@@ -136,16 +136,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('PASSWORD',
+                        Text('PASSWORD',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.2)),
-                        GestureDetector(
-                          onTap: () {},
-                          child: const Text('Forgot?',
-                              style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
-                        ),
+                        // GestureDetector(
+                        //   onTap: () {},
+                        //   child: const Text('Forgot?',
+                        //       style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
+                        // ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -202,12 +202,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 _loading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
                     : AppButton(label: 'Sign in', onPressed: _submit, expand: true),
-
-                const SizedBox(height: 16),
-                const Center(
-                  child: Text('v1.0.0',
-                      style: TextStyle(fontSize: 11, color: AppColors.textDim)),
-                ),
               ],
             ),
           ),

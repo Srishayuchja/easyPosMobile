@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/utils.dart';
 import '../../../models/sale_model.dart';
+import '../home/cashier_home_page.dart';
 import '../scan/scan_page.dart';
 
 class ReceiptPage extends StatefulWidget {
@@ -144,8 +145,6 @@ class _ReceiptPageState extends State<ReceiptPage> with SingleTickerProviderStat
 
                         // Totals
                         _ReceiptRow(label: 'Subtotal', value: 'LKR ${fmtLKR(sale.subtotal)}'),
-                        const SizedBox(height: 4),
-                        _ReceiptRow(label: 'Service 5%', value: 'LKR ${fmtLKR(sale.tax)}'),
                         const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -166,20 +165,32 @@ class _ReceiptPageState extends State<ReceiptPage> with SingleTickerProviderStat
               const SizedBox(height: 18),
 
               Row(children: [
-                Expanded(child: AppButton(label: 'Print', kind: BtnKind.surface, onPressed: () {})),
-                const SizedBox(width: 10),
-                Expanded(child: AppButton(label: 'Share', kind: BtnKind.surface, onPressed: () {})),
-              ]),
-              const SizedBox(height: 10),
-              AppButton(
-                label: 'New sale',
-                expand: true,
-                onPressed: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ScanPage()),
-                  (route) => false,
+                Expanded(
+                  child: AppButton(
+                    label: 'Done',
+                    kind: BtnKind.surface,
+                    onPressed: () => Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CashierHomePage()),
+                      (route) => false,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppButton(
+                    label: 'New sale',
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CashierHomePage()),
+                        (route) => false,
+                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanPage()));
+                    },
+                  ),
+                ),
+              ]),
             ],
           ),
         ),

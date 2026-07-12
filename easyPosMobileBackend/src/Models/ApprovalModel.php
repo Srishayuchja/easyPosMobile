@@ -42,38 +42,75 @@ class ApprovalModel
         return $this->mapRow([
             'id' => $id, 'type' => $type, 'summary' => $summary,
             'requested_by_name' => $requestedByName, 'created_at' => $now,
+            'status' => 'pending',
         ]);
     }
 
     public function getPendingByBusiness(int $businessId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, type, summary, requested_by_name, created_at
+            "SELECT id, type, summary, requested_by_name, created_at, status, payload
                FROM approval_requests
               WHERE business_id = :bid AND status = 'pending'
               ORDER BY created_at ASC"
         );
         $stmt->execute([':bid' => $businessId]);
 
+        $product = new ProductModel($this->db);
+        return array_map(fn(array $r) => $this->mapRow($r, $product), $stmt->fetchAll());
+    }
+
+    /** Pending + rejected requests submitted by one cashier (approved ones are omitted). */
+    public function getMineByBusiness(int $businessId, int $requestedBy): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, type, summary, requested_by_name, created_at, status
+               FROM approval_requests
+              WHERE business_id = :bid AND requested_by = :by AND status IN ('pending', 'rejected')
+              ORDER BY created_at DESC"
+        );
+        $stmt->execute([':bid' => $businessId, ':by' => $requestedBy]);
+
         return array_map([$this, 'mapRow'], $stmt->fetchAll());
     }
 
-    private function mapRow(array $r): array
+    private function mapRow(array $r, ?ProductModel $product = null): array
     {
-        return [
+        $mapped = [
             'id'              => (int)$r['id'],
             'type'            => (string)$r['type'],
             'summary'         => (string)$r['summary'],
             'requestedByName' => (string)$r['requested_by_name'],
             'requestedAt'     => str_replace(' ', 'T', (string)$r['created_at']),
+            'status'          => (string)$r['status'],
         ];
+
+        // For pending restock requests, surface the product's current buying price so
+        // the admin can see it and optionally change it (buying prices drift over time).
+        if ($product !== null && $r['type'] === 'stock_add' && isset($r['payload'])) {
+            $payload   = json_decode((string)$r['payload'], true) ?: [];
+            $productId = (int)($payload['productId'] ?? 0);
+            if ($productId > 0) {
+                $mapped['productId']  = $productId;
+                $mapped['currentBuy'] = $product->findBuyPrice($productId);
+            }
+        }
+
+        return $mapped;
     }
 
     /**
      * Approves a pending request: applies it via ProductModel, then marks it approved.
-     * @throws RuntimeException if the request doesn't exist, isn't pending, or business_id mismatches
+     *
+     * $buyOverride is required for 'new_product' requests since cashiers don't set a
+     * buying price themselves — the admin supplies it here at approval time. For
+     * 'stock_add' requests it's optional: pass it when the buying price changed since
+     * the last restock, or omit it to keep the product's current price.
+     *
+     * @throws RuntimeException if the request doesn't exist, isn't pending, business_id
+     *         mismatches, or a 'new_product' request is approved without a buy price
      */
-    public function approve(int $id, int $businessId, int $locationId, int $reviewerId): void
+    public function approve(int $id, int $businessId, int $locationId, int $reviewerId, ?float $buyOverride = null): void
     {
         $stmt = $this->db->prepare(
             "SELECT * FROM approval_requests WHERE id = :id AND business_id = :bid LIMIT 1"
@@ -91,11 +128,16 @@ class ApprovalModel
         $product = new ProductModel($this->db);
 
         if ($row['type'] === 'new_product') {
+            $buy = $buyOverride ?? (float)($payload['buy'] ?? 0);
+            if ($buy <= 0) {
+                throw new RuntimeException('A buying price greater than 0 is required to approve this product');
+            }
+
             $product->create(
                 (string)($payload['name'] ?? ''),
                 (string)($payload['barcode'] ?? ''),
                 (string)($payload['unit'] ?? ''),
-                (float)($payload['buy'] ?? 0),
+                $buy,
                 (float)($payload['sell'] ?? 0),
                 (int)($payload['stock'] ?? 0),
                 (string)($payload['brand'] ?? ''),
@@ -105,7 +147,7 @@ class ApprovalModel
                 (int)$row['requested_by']
             );
         } elseif ($row['type'] === 'stock_add') {
-            $product->addStock((int)($payload['productId'] ?? 0), (float)($payload['qty'] ?? 0), $locationId);
+            $product->addStock((int)($payload['productId'] ?? 0), (float)($payload['qty'] ?? 0), $locationId, $buyOverride);
         } else {
             throw new RuntimeException("Unknown approval type: {$row['type']}");
         }

@@ -31,10 +31,12 @@ class _AddProductPageState extends State<AddProductPage> {
   String _brand = '';
   String _unitType = '';
   bool _saving = false;
+  bool _isCashier = false;
 
   @override
   void initState() {
     super.initState();
+    _isCashier = context.read<AppState>().currentRole == 'cashier';
     _barcodeCtrl.text = widget.prefillBarcode;
     _buyCtrl.addListener(_recalcMargin);
     _sellCtrl.addListener(_recalcMargin);
@@ -351,7 +353,7 @@ class _AddProductPageState extends State<AddProductPage> {
       _nameCtrl.text.isNotEmpty &&
       _barcodeCtrl.text.isNotEmpty &&
       _unitType.isNotEmpty &&
-      _buyCtrl.text.isNotEmpty &&
+      (_isCashier || _buyCtrl.text.isNotEmpty) &&
       _sellCtrl.text.isNotEmpty;
 
   int? get _margin {
@@ -370,7 +372,7 @@ class _AddProductPageState extends State<AddProductPage> {
       name: _nameCtrl.text.trim(),
       barcode: _barcodeCtrl.text.trim(),
       unit: _unitType,
-      buy: double.parse(_buyCtrl.text),
+      buy: _isCashier ? 0 : double.parse(_buyCtrl.text),
       sell: double.parse(_sellCtrl.text),
       stock: int.tryParse(_stockCtrl.text) ?? 0,
       brand: _brand,
@@ -382,7 +384,8 @@ class _AddProductPageState extends State<AddProductPage> {
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(applied ? 'Product saved' : 'Submitted for admin approval'),
+        content:
+            Text(applied ? 'Product saved' : 'Submitted for admin approval'),
         backgroundColor: AppColors.success,
       ),
     );
@@ -397,8 +400,8 @@ class _AddProductPageState extends State<AddProductPage> {
         child: Column(
           children: [
             AppHeader(
-                title: 'Add product',
-                subtitle: 'Create a new product',
+                title: 'Add Product',
+                subtitle: 'Add a new product',
                 onBack: () => Navigator.pop(context)),
             Expanded(
               child: ListView(
@@ -554,40 +557,48 @@ class _AddProductPageState extends State<AddProductPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  Row(
-                    children: [
-                      Expanded(
-                          flex: 3,
+                  if (_isCashier)
+                    AppTextField(
+                        label: 'SELLING PRICE',
+                        controller: _sellCtrl,
+                        prefix: 'LKR',
+                        numeric: true,
+                        placeholder: '0')
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                            flex: 3,
+                            child: AppTextField(
+                                label: 'BUYING PRICE',
+                                controller: _buyCtrl,
+                                prefix: 'LKR',
+                                numeric: true,
+                                placeholder: '0')),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
                           child: AppTextField(
-                              label: 'BUYING PRICE',
-                              controller: _buyCtrl,
-                              prefix: 'LKR',
-                              numeric: true,
-                              placeholder: '0')),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: AppTextField(
-                          label: 'MARGIN',
-                          controller: _marginCtrl,
-                          focusNode: _marginFocus,
-                          suffix: '%',
-                          numeric: true,
-                          placeholder: '0',
-                          onChanged: _onMarginChanged,
+                            label: 'MARGIN',
+                            controller: _marginCtrl,
+                            focusNode: _marginFocus,
+                            suffix: '%',
+                            numeric: true,
+                            placeholder: '0',
+                            onChanged: _onMarginChanged,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          flex: 3,
-                          child: AppTextField(
-                              label: 'SELLING PRICE',
-                              controller: _sellCtrl,
-                              prefix: 'LKR',
-                              numeric: true,
-                              placeholder: '0')),
-                    ],
-                  ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            flex: 3,
+                            child: AppTextField(
+                                label: 'SELLING PRICE',
+                                controller: _sellCtrl,
+                                prefix: 'LKR',
+                                numeric: true,
+                                placeholder: '0')),
+                      ],
+                    ),
                   const SizedBox(height: 8),
 
                   if (m != null) ...[

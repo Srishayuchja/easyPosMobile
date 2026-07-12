@@ -16,6 +16,7 @@ class AppState extends ChangeNotifier {
   List<String> brands = [];
   List<String> units = ['pcs', 'g', 'kg', 'ml', 'L', 'box', 'pack'];
   List<ApprovalRequestModel> pendingApprovals = [];
+  List<ApprovalRequestModel> myRequests = [];
 
   bool _loading = false;
   bool get loading => _loading;
@@ -28,6 +29,8 @@ class AppState extends ChangeNotifier {
     brands = products.map((p) => p.brand).where((b) => b.isNotEmpty).toSet().toList()..sort();
     if (currentRole == 'admin') {
       pendingApprovals = await ApiService.instance.fetchApprovals();
+    } else if (currentRole == 'cashier') {
+      myRequests = await ApiService.instance.fetchMyRequests();
     }
     _loading = false;
     notifyListeners();
@@ -88,12 +91,17 @@ class AppState extends ChangeNotifier {
   int get cartCount => cart.fold(0, (s, i) => s + i.qty);
   double get cartTotal => cart.fold(0.0, (s, i) => s + i.lineTotal);
 
+  void clearCart() {
+    cart = [];
+    notifyListeners();
+  }
+
   // ─── Checkout ──────────────────────────────────────────────────────────────
 
   Future<SaleModel> submitSale() async {
     final subtotal = cartTotal;
-    final tax = (subtotal * 0.05);
-    final total = subtotal + tax;
+    const tax = 0.0;
+    final total = subtotal;
     final invoiceId = 'INV-${2088 + sales.length}';
 
     final sale = await ApiService.instance.submitSale(
@@ -172,8 +180,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> approveRequest(int id) async {
-    await ApiService.instance.approveRequest(id);
+  Future<void> approveRequest(int id, {double? buy}) async {
+    await ApiService.instance.approveRequest(id, buy: buy);
     pendingApprovals.removeWhere((r) => r.id == id);
     notifyListeners();
     await initialize();
@@ -190,6 +198,13 @@ class AppState extends ChangeNotifier {
     pendingApprovals = [];
     notifyListeners();
     await initialize();
+  }
+
+  // ─── Requests (Cashier) ─────────────────────────────────────────────────────
+
+  Future<void> fetchMyRequests() async {
+    myRequests = await ApiService.instance.fetchMyRequests();
+    notifyListeners();
   }
 
   // ─── Computed helpers ──────────────────────────────────────────────────────

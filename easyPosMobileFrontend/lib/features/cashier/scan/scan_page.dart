@@ -4,14 +4,11 @@ import 'package:provider/provider.dart';
 import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_header.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/utils.dart';
+import '../../../core/widgets/prod_avatar.dart';
 import '../../../models/product_model.dart';
 import '../cart/cart_page.dart';
-import '../../auth/login_page.dart';
-import '../../admin/products/add_product_page.dart';
-import '../../admin/purchase/purchase_page.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -31,6 +28,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     super.initState();
     _scanLineCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
     _scannerCtrl = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+    _codeCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -41,12 +41,16 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
-  void _toggleManualMode() {
+  Future<void> _toggleManualMode() async {
     setState(() => _manualMode = !_manualMode);
-    if (_manualMode) {
-      _scannerCtrl.stop();
-    } else {
-      _scannerCtrl.start();
+    try {
+      if (_manualMode) {
+        await _scannerCtrl.stop();
+      } else {
+        await _scannerCtrl.start();
+      }
+    } catch (_) {
+      // Camera may already be in the desired state; safe to ignore.
     }
   }
 
@@ -69,22 +73,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     });
   }
 
-  void _addQuick(ProductModel p) {
+  void _selectManual(ProductModel p) {
     context.read<AppState>().addToCart(p);
     _showToast('+1 ${p.name}');
-  }
-
-  void _findByCode() {
-    final q = _codeCtrl.text.trim();
-    final state = context.read<AppState>();
-    final results = state.searchProducts(q);
-    if (results.isNotEmpty) {
-      state.addToCart(results.first);
-      _showToast('+1 ${results.first.name}');
-      _codeCtrl.clear();
-    } else {
-      _showToast('No match found');
-    }
+    _codeCtrl.clear();
   }
 
   @override
@@ -92,7 +84,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     final state = context.watch<AppState>();
     final cartCount = state.cartCount;
     final cartTotal = state.cartTotal;
-    final products  = state.products;
+    final query = _codeCtrl.text.trim();
+    final manualResults = query.isEmpty ? <ProductModel>[] : state.searchProducts(query).take(8).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -101,17 +94,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           children: [
             AppHeader(
               title: 'New Sale',
-              subtitle: 'Cashier · ${state.currentUser?.name ?? ''}',
-              trailing: GestureDetector(
-                onTap: () {
-                  state.logout();
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(Icons.logout_outlined, size: 20, color: AppColors.textMuted),
-                ),
-              ),
+              subtitle: 'Scan or enter a barcode',
+              onBack: Navigator.canPop(context) ? () => Navigator.pop(context) : null,
             ),
 
             Expanded(
@@ -180,93 +164,30 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               border: Border.all(color: AppColors.border, style: BorderStyle.solid),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: _manualMode
-                                ? _ManualEntry(ctrl: _codeCtrl, onFind: _findByCode)
-                                : _ScanViewport(
-                                    anim: _scanLineCtrl,
-                                    controller: _scannerCtrl,
-                                    onDetect: _onBarcodeDetected,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Offstage(
+                                    offstage: _manualMode,
+                                    child: _ScanViewport(
+                                      anim: _scanLineCtrl,
+                                      controller: _scannerCtrl,
+                                      onDetect: _onBarcodeDetected,
+                                    ),
                                   ),
+                                ),
+                                Positioned.fill(
+                                  child: Offstage(
+                                    offstage: !_manualMode,
+                                    child: _ManualEntry(ctrl: _codeCtrl, results: manualResults, onSelect: _selectManual),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('QUICK ADD',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.3)),
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: products.take(4).map((p) {
-                      return GestureDetector(
-                        onTap: () => _addQuick(p),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Text('+', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                            const SizedBox(width: 6),
-                            Text(p.name.split(' ').take(2).join(' '),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
-                          ]),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 14),
-
-                  const Text('QUICK ACTIONS',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.3)),
-                  const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddProductPage())),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Column(children: [
-                              Icon(Icons.add_circle_outline, size: 18, color: AppColors.accent),
-                              SizedBox(height: 4),
-                              Text('Add product', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
-                            ]),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasePage())),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: const Column(children: [
-                              Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.accent),
-                              SizedBox(height: 4),
-                              Text('Add stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.text)),
-                            ]),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -440,16 +361,17 @@ class _ReticlePainter extends CustomPainter {
 }
 
 class _ManualEntry extends StatelessWidget {
-  const _ManualEntry({required this.ctrl, required this.onFind});
+  const _ManualEntry({required this.ctrl, required this.results, required this.onSelect});
   final TextEditingController ctrl;
-  final VoidCallback onFind;
+  final List<ProductModel> results;
+  final ValueChanged<ProductModel> onSelect;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppTextField(
             label: 'BARCODE OR NAME',
@@ -457,16 +379,60 @@ class _ManualEntry extends StatelessWidget {
             placeholder: 'e.g. 4792024031019',
             autofocus: true,
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: AppButton(
-              label: 'Find product',
-              onPressed: onFind,
-              disabled: false,
-              expand: true,
+          const SizedBox(height: 10),
+          if (ctrl.text.trim().isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Start typing to search products',
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim)),
+            )
+          else if (results.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('No match found',
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim)),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: results.length,
+                itemBuilder: (_, i) {
+                  final p = results[i];
+                  return GestureDetector(
+                    onTap: () => onSelect(p),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          ProdAvatar(name: p.name, size: 32),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p.name,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.text)),
+                                Text('${p.unit} · ${p.barcode}',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.add_circle_outline, size: 18, color: AppColors.accent),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
       ),
     );

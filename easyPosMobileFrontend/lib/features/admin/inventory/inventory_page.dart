@@ -6,7 +6,6 @@ import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/prod_avatar.dart';
 import '../../../core/widgets/barcode_scan_page.dart';
 import '../../../core/utils.dart';
-import '../products/add_product_page.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -46,21 +45,9 @@ class _InventoryPageState extends State<InventoryPage> {
         child: Column(
           children: [
             AppHeader(
-              title: 'Inventory',
+              title: 'View Products',
               subtitle: '${state.products.length} products',
               onBack: () => Navigator.pop(context),
-              trailing: GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddProductPage())),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(10)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.add, size: 14, color: AppColors.accentInk),
-                    SizedBox(width: 4),
-                    Text('New', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accentInk)),
-                  ]),
-                ),
-              ),
             ),
 
             Expanded(

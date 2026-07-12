@@ -4,6 +4,7 @@ import '../../../app_state.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../../../core/utils.dart';
 import '../../../models/approval_request_model.dart';
 
@@ -16,6 +17,10 @@ class ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<ReviewPage> {
   bool _busy = false;
   int? _busyId;
+  // Buying price entered by the admin for each pending request: required for
+  // 'new_product' (cashiers don't set one), and prefilled with the product's current
+  // price for 'stock_add' so the admin can keep it or override it if the cost changed.
+  final Map<int, TextEditingController> _buyCtrls = {};
 
   @override
   void initState() {
@@ -23,10 +28,59 @@ class _ReviewPageState extends State<ReviewPage> {
     context.read<AppState>().fetchApprovals();
   }
 
+  @override
+  void dispose() {
+    for (final c in _buyCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _buyCtrlFor(int id, {double? initial}) => _buyCtrls.putIfAbsent(id, () {
+        final c = TextEditingController();
+        if (initial != null && initial > 0) c.text = initial.toStringAsFixed(2);
+        return c;
+      });
+
+  // True when the buying price entered for [r] would block approval.
+  bool _buyInvalid(ApprovalRequestModel r) {
+    if (r.type == 'new_product') {
+      return (double.tryParse(_buyCtrlFor(r.id).text) ?? 0) <= 0;
+    }
+    if (r.type == 'stock_add') {
+      final text = _buyCtrlFor(r.id, initial: r.currentBuy).text.trim();
+      if (text.isEmpty) return false; // keep the product's current buying price
+      return (double.tryParse(text) ?? 0) <= 0;
+    }
+    return false;
+  }
+
   Future<void> _approve(ApprovalRequestModel r) async {
+    double? buy;
+    if (r.type == 'new_product') {
+      buy = double.tryParse(_buyCtrlFor(r.id).text);
+      if (buy == null || buy <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a buying price before approving'), backgroundColor: AppColors.danger),
+        );
+        return;
+      }
+    } else if (r.type == 'stock_add') {
+      final text = _buyCtrlFor(r.id, initial: r.currentBuy).text.trim();
+      if (text.isNotEmpty) {
+        buy = double.tryParse(text);
+        if (buy == null || buy <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Enter a valid buying price'), backgroundColor: AppColors.danger),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() { _busy = true; _busyId = r.id; });
     try {
-      await context.read<AppState>().approveRequest(r.id);
+      await context.read<AppState>().approveRequest(r.id, buy: buy);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -130,6 +184,27 @@ class _ReviewPageState extends State<ReviewPage> {
                                   const SizedBox(height: 8),
                                   Text('Requested by ${r.requestedByName} · ${timeAgo(r.requestedAt)}',
                                       style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                  if (r.type == 'new_product') ...[
+                                    const SizedBox(height: 12),
+                                    AppTextField(
+                                      label: 'BUYING PRICE',
+                                      controller: _buyCtrlFor(r.id),
+                                      prefix: 'LKR',
+                                      numeric: true,
+                                      placeholder: 'Required to approve',
+                                      onChanged: (_) => setState(() {}),
+                                    ),
+                                  ] else if (r.type == 'stock_add') ...[
+                                    const SizedBox(height: 12),
+                                    AppTextField(
+                                      label: 'BUYING PRICE',
+                                      controller: _buyCtrlFor(r.id, initial: r.currentBuy),
+                                      prefix: 'LKR',
+                                      numeric: true,
+                                      placeholder: 'Same as current price',
+                                      onChanged: (_) => setState(() {}),
+                                    ),
+                                  ],
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
@@ -148,8 +223,10 @@ class _ReviewPageState extends State<ReviewPage> {
                                         child: AppButton(
                                           label: 'Approve',
                                           size: BtnSize.sm,
-                                          onPressed: (_busy && _busyId == r.id) ? null : () => _approve(r),
-                                          disabled: _busy && _busyId == r.id,
+                                          onPressed: (_busy && _busyId == r.id) || _buyInvalid(r)
+                                              ? null
+                                              : () => _approve(r),
+                                          disabled: (_busy && _busyId == r.id) || _buyInvalid(r),
                                           expand: true,
                                         ),
                                       ),

@@ -216,18 +216,32 @@ class ProductModel
         return (int)$this->db->lastInsertId();
     }
 
+    /** Returns the current default buying price for a product's variation, or null if not found. */
+    public function findBuyPrice(int $productId): ?float
+    {
+        $stmt = $this->db->prepare(
+            "SELECT default_purchase_price FROM variations WHERE product_id = :pid AND deleted_at IS NULL LIMIT 1"
+        );
+        $stmt->execute([':pid' => $productId]);
+        $value = $stmt->fetchColumn();
+        return $value === false ? null : (float)$value;
+    }
+
     /**
      * Increments on-hand stock for a product's (single) variation at a location,
      * creating the variation_location_details row if one doesn't exist yet.
+     * If $buyPrice is given (buying price sometimes changes between restocks), the
+     * variation's purchase price is updated to it; otherwise the existing price is kept.
      *
      * @throws \RuntimeException if the product has no variation
      */
-    public function addStock(int $productId, float $qty, int $locationId): void
+    public function addStock(int $productId, float $qty, int $locationId, ?float $buyPrice = null): void
     {
         $now = date('Y-m-d H:i:s');
 
         $stmt = $this->db->prepare(
-            "SELECT id, product_variation_id FROM variations WHERE product_id = :pid AND deleted_at IS NULL LIMIT 1"
+            "SELECT id, product_variation_id, default_sell_price
+               FROM variations WHERE product_id = :pid AND deleted_at IS NULL LIMIT 1"
         );
         $stmt->execute([':pid' => $productId]);
         $variation = $stmt->fetch();
@@ -254,6 +268,22 @@ class ProductModel
             $stmt->execute([
                 ':pid' => $productId, ':pvid' => $productVariationId, ':vid' => $variationId,
                 ':loc' => $locationId, ':qty' => $qty, ':now1' => $now, ':now2' => $now,
+            ]);
+        }
+
+        if ($buyPrice !== null && $buyPrice > 0) {
+            $sell          = (float)$variation['default_sell_price'];
+            $profitPercent = round((($sell - $buyPrice) / $buyPrice) * 100, 4);
+
+            $stmt = $this->db->prepare(
+                "UPDATE variations
+                    SET default_purchase_price = :buy1, dpp_inc_tax = :buy2,
+                        profit_percent = :profit, updated_at = :now
+                  WHERE id = :vid"
+            );
+            $stmt->execute([
+                ':buy1' => $buyPrice, ':buy2' => $buyPrice, ':profit' => $profitPercent,
+                ':now' => $now, ':vid' => $variationId,
             ]);
         }
     }

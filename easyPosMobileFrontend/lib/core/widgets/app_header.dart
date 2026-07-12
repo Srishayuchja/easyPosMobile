@@ -7,12 +7,14 @@ class AppHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onBack,
+    this.backLabel,
     this.trailing,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+  final String? backLabel;
   final Widget? trailing;
 
   @override
@@ -28,15 +30,27 @@ class AppHeader extends StatelessWidget {
           if (onBack != null) ...[
             GestureDetector(
               onTap: onBack,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.chevron_left, color: AppColors.text, size: 22),
-              ),
+              child: backLabel != null
+                  ? Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(backLabel!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.danger)),
+                    )
+                  : Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.chevron_left, color: AppColors.text, size: 22),
+                    ),
             ),
             const SizedBox(width: 12),
           ],

@@ -38,15 +38,21 @@ class ProductController
         $buy     = (float)($body['buy'] ?? 0);
         $sell    = (float)($body['sell'] ?? 0);
 
+        $createdBy = (int)($authPayload['uid'] ?? 1);
+        $role      = (string)($authPayload['role'] ?? 'admin');
+
         if ($name === '' || $barcode === '' || $unit === '') {
             Response::error('name, barcode and unit are required', 422);
         }
-        if ($buy <= 0 || $sell <= 0) {
-            Response::error('buy and sell prices must be greater than 0', 422);
+        if ($sell <= 0) {
+            Response::error('sell price must be greater than 0', 422);
+        }
+        // Cashiers don't see/set the buying price — the admin fills it in when
+        // approving the request, so skip this check for their submissions.
+        if ($role !== 'cashier' && $buy <= 0) {
+            Response::error('buy price must be greater than 0', 422);
         }
 
-        $createdBy = (int)($authPayload['uid'] ?? 1);
-        $role      = (string)($authPayload['role'] ?? 'admin');
         $stock     = (int)($body['stock'] ?? 0);
         $brand     = trim((string)($body['brand'] ?? ''));
         $alertQty  = (int)($body['alertQty'] ?? 0);
