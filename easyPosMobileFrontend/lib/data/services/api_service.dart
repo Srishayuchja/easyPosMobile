@@ -10,7 +10,7 @@ class ApiService {
   ApiService._();
   static final ApiService instance = ApiService._();
 
-  static const String _baseUrl = 'http://192.168.1.9/easypos/api';
+  static const String _baseUrl = 'https://miniyansolutions.com/api';
 
   String? _token;
   String? _cashierId;
